@@ -1,0 +1,188 @@
+name: "API — Test & Deploy"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "championkids-api/**"
+      - ".github/workflows/api.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "championkids-api/**"
+      - ".github/workflows/api.yml"
+
+defaults:
+  run:
+    working-directory: championkids-api
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 1: Run pytest with coverage against a live MongoDB service container
+  # ──────────────────────────────────────────────────────────────────────────────
+  test:
+    name: "Test (pytest + coverage)"
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        # Health check ensures Mongo is accepting connections before tests start
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MONGODB_URL: mongodb://localhost:27017
+      MONGODB_DB_NAME: championkids_test
+      JWT_SECRET: test-secret-for-ci-only
+      ENVIRONMENT: test
+      # Placeholders for env vars required at import time but unused during tests
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_ANON_KEY: test-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: test-placeholder
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      SENTRY_DSN: ""
+      CORS_ORIGINS: "http://localhost:3000"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Cache pip dependencies keyed on requirements files so the cache
+      # is invalidated whenever any dependency version changes.
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('championkids-api/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      # Upload coverage report to Codecov — step is skipped if the secret
+      # is not configured, so this is safe for forks / new environments.
+      - name: Upload coverage to Codecov
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: championkids-api/coverage.xml
+          flags: api
+          fail_ci_if_error: false
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 2: Static analysis — ruff (linting) + mypy (type checking)
+  # ──────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: "Lint (ruff + mypy)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('championkids-api/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+
+      - name: Install linting tools
+        run: pip install ruff mypy
+
+      # Install stubs and the app's own dependencies so mypy can resolve types
+      - name: Install app dependencies (for mypy)
+        run: pip install -r requirements.txt
+
+      - name: Run ruff (linter)
+        run: ruff check app/
+
+      - name: Run mypy (type checker)
+        run: mypy app/ --ignore-missing-imports
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 3: Deploy to Railway/Render — only runs on push to main after both
+  #         test and lint jobs pass.
+  # ──────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: "Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    # Only deploy on direct pushes to main — never on pull requests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Option A: Railway (token-based CLI deploy) ────────────────────────────
+      # Uncomment this block if you use Railway and set the RAILWAY_TOKEN secret.
+      #
+      # - name: Install Railway CLI
+      #   run: npm install -g @railway/cli
+      #
+      # - name: Deploy to Railway
+      #   run: railway up --service championkids-api --detach
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # ── Option B: Render (deploy hook webhook) ────────────────────────────────
+      # Uncomment this block if you use Render and set the RENDER_DEPLOY_HOOK_URL
+      # secret to your service's deploy hook URL from the Render dashboard.
+      #
+      - name: Trigger Render deploy hook
+        run: |
+          curl --silent --show-error --fail \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+      # Poll the health endpoint until it responds 200 or the 120 s timeout
+      # expires. This catches boot-time errors before the workflow marks a
+      # deploy as successful.
+      - name: Wait for health check
+        run: |
+          echo "Waiting for API health check..."
+          TIMEOUT=120
+          ELAPSED=0
+          INTERVAL=10
+          URL="https://api.championkids.app/health"
+
+          until curl --silent --fail "$URL" > /dev/null 2>&1; do
+            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+              echo "Health check timed out after ${TIMEOUT}s"
+              exit 1
+            fi
+            echo "  ...not ready yet (${ELAPSED}s elapsed), retrying in ${INTERVAL}s"
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "API is healthy at $URL"

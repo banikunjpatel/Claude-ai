@@ -1,0 +1,1 @@
+"""ChampionKids FastAPI application package."""

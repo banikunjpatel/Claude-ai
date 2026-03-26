@@ -1,0 +1,158 @@
+name: "Mobile — Build"
+
+on:
+  # Automatically build preview on every push to the release branch
+  push:
+    branches: [release]
+
+  # Manual trigger allows choosing between preview and production builds.
+  # Production builds also submit to TestFlight and Google Internal Test Track.
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        required: true
+        default: "preview"
+        type: choice
+        options:
+          - preview
+          - production
+
+defaults:
+  run:
+    working-directory: championkids-mobile
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 1: TypeScript type-check (Detox E2E tests added in week 11)
+  # ──────────────────────────────────────────────────────────────────────────────
+  test:
+    name: "Type-check"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: championkids-mobile/node_modules
+          key: ${{ runner.os }}-mobile-node-${{ hashFiles('championkids-mobile/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-mobile-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 2: EAS preview build (both platforms)
+  #         Runs on every push to `release` OR manual trigger with profile=preview.
+  #         Produces an internal distribution build (no store submission).
+  # ──────────────────────────────────────────────────────────────────────────────
+  eas-build-preview:
+    name: "EAS Build (preview)"
+    runs-on: ubuntu-latest
+    needs: test
+    # Run for auto push to release, or for manual trigger when profile != production
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.profile == 'preview')
+
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: championkids-mobile/node_modules
+          key: ${{ runner.os }}-mobile-node-${{ hashFiles('championkids-mobile/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-mobile-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@latest
+
+      # --non-interactive is required in CI — EAS must not prompt for input.
+      # --platform all builds iOS and Android in a single command.
+      - name: EAS Build — preview (iOS + Android)
+        run: eas build --platform all --profile preview --non-interactive
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 3: EAS production build + store submission
+  #         Only runs when manually triggered with profile=production.
+  #         Submits to TestFlight (iOS) and Internal Test Track (Android).
+  #
+  #         Required secrets:
+  #           EXPO_TOKEN                    — EAS authentication
+  #           APPLE_APP_SPECIFIC_PASSWORD   — used by eas submit for TestFlight
+  # ──────────────────────────────────────────────────────────────────────────────
+  eas-build-production:
+    name: "EAS Build + Submit (production)"
+    runs-on: ubuntu-latest
+    needs: test
+    # Guard: only run on explicit manual trigger with production profile
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.profile == 'production'
+
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Required by `eas submit` for TestFlight App Store Connect login
+      EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: championkids-mobile/node_modules
+          key: ${{ runner.os }}-mobile-node-${{ hashFiles('championkids-mobile/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-mobile-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@latest
+
+      - name: EAS Build — production (iOS + Android)
+        run: eas build --platform all --profile production --non-interactive
+
+      # Submit the latest iOS build to TestFlight for internal testing.
+      # EAS Submit picks up the most recent successful production build
+      # automatically when no --id flag is provided.
+      - name: EAS Submit — iOS (TestFlight)
+        run: eas submit --platform ios --non-interactive
+
+      # Submit the latest Android build to the Internal Test Track.
+      - name: EAS Submit — Android (Internal Test Track)
+        run: eas submit --platform android --non-interactive
