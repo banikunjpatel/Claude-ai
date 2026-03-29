@@ -1,0 +1,221 @@
+name: "PR — All Checks"
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel any in-progress run for the same PR when a new commit is pushed,
+# saving CI minutes on rapid iteration.
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 1: API tests (mirrors api.yml test job, runs on every PR)
+  # ──────────────────────────────────────────────────────────────────────────────
+  api-tests:
+    name: "API Tests"
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MONGODB_URL: mongodb://localhost:27017
+      MONGODB_DB_NAME: championkids_test
+      JWT_SECRET: test-secret-for-ci-only
+      ENVIRONMENT: test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_ANON_KEY: test-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: test-placeholder
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      SENTRY_DSN: ""
+      CORS_ORIGINS: "http://localhost:3000"
+
+    defaults:
+      run:
+        working-directory: championkids-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('championkids-api/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run pytest
+        run: pytest tests/ -v --tb=short
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 2: Web build + lint (mirrors web.yml build-and-lint job)
+  # ──────────────────────────────────────────────────────────────────────────────
+  web-build:
+    name: "Web Build & Lint"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: championkids-web
+
+    env:
+      VITE_API_BASE_URL: https://api.championkids.app
+      # Use placeholder values on PRs — real secrets only needed for deploy
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+      VITE_ENVIRONMENT: ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: championkids-web/node_modules
+          key: ${{ runner.os }}-web-node-${{ hashFiles('championkids-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-web-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+      - name: Build
+        run: npm run build
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 3: Mobile TypeScript type-check
+  # ──────────────────────────────────────────────────────────────────────────────
+  mobile-typecheck:
+    name: "Mobile Type-check"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: championkids-mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: championkids-mobile/node_modules
+          key: ${{ runner.os }}-mobile-node-${{ hashFiles('championkids-mobile/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-mobile-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npm run type-check
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 4: Security scans
+  #   - npm audit on the web app (fails on high/critical vulnerabilities)
+  #   - pip-audit on the API Python dependencies
+  # ──────────────────────────────────────────────────────────────────────────────
+  security-scan:
+    name: "Security Scan"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # npm audit exits non-zero only for high/critical vulnerabilities.
+      # --audit-level=high ensures low/moderate findings don't block PRs.
+      - name: npm audit (web — high/critical)
+        working-directory: championkids-web
+        run: |
+          npm ci --prefer-offline --ignore-scripts 2>/dev/null || npm ci
+          npm audit --audit-level=high --omit=dev
+
+      # pip-audit scans the API's locked dependency set for known CVEs.
+      - name: pip-audit (api)
+        working-directory: championkids-api
+        run: |
+          pip install pip-audit --quiet
+          pip-audit -r requirements.txt --progress-spinner off
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # Job 5: Validate PR title follows Conventional Commits format
+  #   Pattern: <type>(<scope>): <description>
+  #   Valid types: feat fix chore docs test refactor perf ci build
+  # ──────────────────────────────────────────────────────────────────────────────
+  pr-title-check:
+    name: "PR Title (Conventional Commits)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title format
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          PATTERN='^(feat|fix|chore|docs|test|refactor|perf|ci|build)\(.+\):.+'
+
+          echo "PR title: $PR_TITLE"
+
+          if echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "PR title matches Conventional Commits format."
+          else
+            echo ""
+            echo "ERROR: PR title does not match the required format."
+            echo ""
+            echo "Expected format:  <type>(<scope>): <description>"
+            echo "Example:          feat(api): add streak calculation endpoint"
+            echo ""
+            echo "Valid types: feat | fix | chore | docs | test | refactor | perf | ci | build"
+            echo ""
+            exit 1
+          fi

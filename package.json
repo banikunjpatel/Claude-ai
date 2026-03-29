@@ -1,0 +1,26 @@
+{
+  "name": "championkids",
+  "private": true,
+  "workspaces": [
+    "championkids-web",
+    "championkids-mobile"
+  ],
+  "scripts": {
+    "api:dev": "cd championkids-api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "api:test": "cd championkids-api && pytest tests/ -v --tb=short",
+    "api:lint": "cd championkids-api && ruff check app/ && mypy app/ --ignore-missing-imports",
+    "web:dev": "npm run dev --workspace=championkids-web",
+    "web:build": "npm run build --workspace=championkids-web",
+    "web:lint": "npm run lint --workspace=championkids-web",
+    "web:type-check": "npm run type-check --workspace=championkids-web",
+    "mobile:start": "npm run start --workspace=championkids-mobile",
+    "mobile:type-check": "npm run type-check --workspace=championkids-mobile",
+    "ci:web": "npm run web:lint && npm run web:type-check && npm run web:build",
+    "ci:mobile": "npm run mobile:type-check",
+    "ci:all": "npm run ci:web && npm run ci:mobile && npm run api:lint && npm run api:test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

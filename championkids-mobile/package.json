@@ -1,0 +1,61 @@
+{
+  "name": "championkids-mobile",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "build:preview": "eas build --profile preview --platform all",
+    "build:production": "eas build --profile production --platform all",
+    "lint": "eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gorhom/bottom-sheet": "^4.6.4",
+    "@hookform/resolvers": "^3.9.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/datetimepicker": "8.2.0",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.17",
+    "@react-navigation/native-stack": "^6.9.26",
+    "@sentry/react-native": "~5.33.2",
+    "@supabase/supabase-js": "^2.44.2",
+    "@tanstack/react-query": "^5.50.0",
+    "axios": "^1.7.2",
+    "date-fns": "^3.6.0",
+    "expo": "~51.0.28",
+    "expo-constants": "~16.0.2",
+    "expo-notifications": "~0.28.9",
+    "expo-secure-store": "~13.0.2",
+    "expo-splash-screen": "~0.27.5",
+    "expo-status-bar": "~1.12.1",
+    "nativewind": "^4.0.36",
+    "react": "18.2.0",
+    "react-hook-form": "^7.52.1",
+    "react-native": "0.74.5",
+    "react-native-gesture-handler": "~2.16.1",
+    "react-native-reanimated": "~3.10.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-screens": "~3.31.1",
+    "tailwindcss": "^3.4.6",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.4",
+    "@expo-google-fonts/plus-jakarta-sans": "^0.2.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@tanstack/react-query-devtools": "^5.50.0",
+    "@types/react": "~18.2.45",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "typescript": "^5.3.3"
+  },
+  "expo": {
+    "install": {
+      "exclude": ["react-native-reanimated"]
+    }
+  }
+}
