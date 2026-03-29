@@ -1,0 +1,10 @@
+[run]
+source = app
+omit =
+    app/scripts/*
+    app/models/*
+
+[report]
+omit =
+    app/scripts/*
+    app/models/*

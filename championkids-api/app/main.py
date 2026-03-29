@@ -77,6 +77,17 @@ def create_app() -> FastAPI:
     register_middleware(app)
     register_exception_handlers(app)
 
+    # ── Feature routers ───────────────────────────────────────────────────────
+    from app.routers import auth, children, activities, subscriptions, progress
+
+    # Progress and activities are mounted before children so that more-specific
+    # paths like /children/{id}/progress are matched before /children/{id}.
+    app.include_router(auth.router,          prefix="/api/v1")
+    app.include_router(progress.router,      prefix="/api/v1")
+    app.include_router(activities.router,    prefix="/api/v1")
+    app.include_router(subscriptions.router, prefix="/api/v1")
+    app.include_router(children.router,      prefix="/api/v1")
+
     # ── Health endpoints ──────────────────────────────────────────────────────
 
     def _health_payload() -> dict:

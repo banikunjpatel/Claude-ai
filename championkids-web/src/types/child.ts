@@ -6,24 +6,33 @@ export interface Child {
   id: string
   parentId: string
   name: string
-  dateOfBirth: string       // ISO date string "YYYY-MM-DD"
+  display_name?: string
+  dateOfBirth: string
+  date_of_birth?: string
   avatarUrl: string | null
-  ageBand: AgeBand          // computed at API layer — never stored as a fixed field
+  avatar_id?: number
+  /** Computed at API layer. Can be null if age is outside supported range. */
+  ageBand: AgeBand | null
+  skill_focuses?: string[]
+  streak?: number
+  total_completions?: number
   createdAt: string
   updatedAt: string
   deletedAt: string | null
 }
 
 export interface CreateChildInput {
-  name: string
-  dateOfBirth: string
-  avatarUrl?: string
+  display_name: string
+  date_of_birth: string
+  avatar_id: number
+  skill_focuses: string[]
 }
 
 export interface UpdateChildInput {
-  name?: string
-  dateOfBirth?: string
-  avatarUrl?: string | null
+  display_name?: string
+  date_of_birth?: string
+  avatar_id?: number
+  skill_focuses?: string[]
 }
 
 export interface ChildSkillFocus {

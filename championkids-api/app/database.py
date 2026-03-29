@@ -53,6 +53,7 @@ async def connect_db() -> None:
     _client = AsyncIOMotorClient(
         settings.MONGODB_URL,
         serverSelectionTimeoutMS=5000,
+        tz_aware=True,   # Motor returns timezone-aware datetimes (UTC)
     )
     # Force a round-trip to confirm connectivity before the app starts serving
     await _client.admin.command("ping")

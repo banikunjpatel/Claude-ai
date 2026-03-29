@@ -1,5 +1,6 @@
 /** Activity card with preview and detail variants plus a skeleton loading state. */
 
+import { useNavigate } from 'react-router-dom'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import SkillBadge from '@/components/SkillBadge'
@@ -54,8 +55,15 @@ function ActivityCardSkeleton({ variant }: { variant: 'preview' | 'detail' }) {
 // ── Preview variant ───────────────────────────────────────────────────────────
 
 function PreviewCard({ activity, onComplete }: { activity: Activity; onComplete?: () => void }) {
+  const navigate = useNavigate()
+
+  function handleLetsGo() {
+    navigate(`/app/activities/${activity.id}`)
+    onComplete?.()
+  }
+
   return (
-    <Card padding="lg" hover={!!onComplete} className="w-full animate-fade-in">
+    <Card padding="lg" hover className="w-full animate-fade-in">
       <div className="flex flex-col gap-3">
         {/* Skill + age band chips */}
         <div className="flex flex-wrap items-center gap-2">
@@ -85,13 +93,11 @@ function PreviewCard({ activity, onComplete }: { activity: Activity; onComplete?
         </p>
 
         {/* CTA */}
-        {onComplete && (
-          <div className="pt-2">
-            <Button variant="primary" fullWidth onClick={onComplete}>
-              Let's go
-            </Button>
-          </div>
-        )}
+        <div className="pt-2">
+          <Button variant="primary" fullWidth onClick={handleLetsGo}>
+            Let's go
+          </Button>
+        </div>
       </div>
     </Card>
   )

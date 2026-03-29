@@ -25,11 +25,17 @@ export const activitiesApi = {
       .get<APIResponse<Activity>>(`/activities/${activityId}`)
       .then((r) => r.data),
 
-  completeActivity: (activityId: string, childId: string, durationSeconds?: number) =>
+  completeActivity: (
+    activityId: string,
+    childId: string,
+    durationSeconds?: number,
+    reaction?: string,
+  ) =>
     apiClient
       .post<APIResponse<ActivityCompletion>>(`/activities/${activityId}/complete`, {
         childId,
         durationSeconds,
+        reaction,
       })
       .then((r) => r.data),
 

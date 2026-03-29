@@ -6,9 +6,7 @@ import { z } from 'zod'
 import AuthLayout from '@/components/layout/AuthLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { supabase } from '@/auth/supabaseClient'
 import { useAuth } from '@/auth/AuthProvider'
-import type { AppError } from '@/types/api'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email address'),
@@ -20,7 +18,7 @@ type FormValues = z.infer<typeof schema>
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, signIn } = useAuth()
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/app/today'
 
   // Already logged in → redirect
@@ -36,17 +34,15 @@ export default function LoginPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   async function onSubmit(values: FormValues) {
-    const { error } = await supabase.auth.signInWithPassword({
-      email:    values.email,
-      password: values.password,
-    })
-
-    if (error) {
-      setError('root', { message: error.message })
-      return
+    try {
+      await signIn(values.email, values.password)
+      // Do NOT navigate here. signIn updates the Zustand store via onAuthStateChange,
+      // but AuthProvider hasn't re-rendered yet at this point. Navigating now causes
+      // ProtectedRoute to see user=null and bounce back to /login.
+      // PublicRoute re-renders once the context updates and handles the redirect.
+    } catch (err) {
+      setError('root', { message: (err as Error).message })
     }
-
-    navigate(from, { replace: true })
   }
 
   return (

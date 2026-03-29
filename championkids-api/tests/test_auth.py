@@ -314,7 +314,10 @@ async def test_get_or_create_mongo_user_idempotent(test_db):
     second = await get_or_create_mongo_user(uid, "idem@test.com", "Idem User Updated", test_db)
 
     assert second["referral_code"] == first["referral_code"]
-    assert second["created_at"] == first["created_at"]
+    # MongoDB stores datetimes at millisecond precision; normalise before comparing
+    def _sec(dt):
+        return dt.replace(tzinfo=None, microsecond=0) if dt else None
+    assert _sec(second["created_at"]) == _sec(first["created_at"])
     assert second["full_name"] == "Idem User Updated"
 
     # Cleanup

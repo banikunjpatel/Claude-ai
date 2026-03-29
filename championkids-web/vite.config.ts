@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -10,7 +11,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 5173,
     strictPort: true,
   },
   build: {
@@ -23,6 +24,24 @@ export default defineConfig({
           supabase: ['@supabase/supabase-js'],
         },
       },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/**',
+        'src/test/**',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        '**/*.d.ts',
+        'vite.config.ts',
+      ],
     },
   },
 })

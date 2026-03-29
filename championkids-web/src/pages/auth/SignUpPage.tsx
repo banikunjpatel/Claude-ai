@@ -49,6 +49,7 @@ export default function SignUpPage() {
                             'Strong'
 
   async function onSubmit(values: FormValues) {
+    // 1. Create the Supabase auth account
     const { error } = await supabase.auth.signUp({
       email:    values.email,
       password: values.password,
@@ -64,6 +65,9 @@ export default function SignUpPage() {
       return
     }
 
+    // 2. Navigate into the app.
+    //    The backend auto-creates a free trial on every new Supabase user
+    //    (via webhook / DB trigger), so there is nothing extra to call here.
     navigate('/app/today', { replace: true })
   }
 

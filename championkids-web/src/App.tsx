@@ -1,11 +1,11 @@
 /** React Router v6 application router.
  *
  * Route tree:
- *   /                          → redirect to /app/today (auth) or /login (anon)
- *   /login                     → LoginPage          (AuthLayout)
- *   /signup                    → SignUpPage          (AuthLayout)
- *   /forgot-password           → ForgotPasswordPage  (AuthLayout)
- *   /reset-password            → ResetPasswordPage   (AuthLayout)
+ *   /                          → PublicRoute → HomePage (marketing)
+ *   /login                     → PublicRoute → LoginPage          (AuthLayout)
+ *   /signup                    → PublicRoute → SignUpPage          (AuthLayout)
+ *   /forgot-password           → PublicRoute → ForgotPasswordPage  (AuthLayout)
+ *   /reset-password            → PublicRoute → ResetPasswordPage   (AuthLayout)
  *   /app/*                     → ProtectedRoute → AppLayout
  *     today                    → TodayPage
  *     library                  → LibraryPage
@@ -17,13 +17,16 @@
  *     subscription/success     → SuccessPage
  *     subscription/cancel      → CancelPage
  *     subscription/manage      → ManagePage
- *   *                          → redirect to /app/today
+ *   *                          → redirect to /
  */
 
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 
 import ProtectedRoute from '@/auth/ProtectedRoute'
-import AppLayout from '@/components/layout/AppLayout'
+import PublicRoute    from '@/auth/PublicRoute'
+import AppLayout      from '@/components/layout/AppLayout'
+
+import HomePage from '@/pages/HomePage'
 
 import LoginPage           from '@/pages/auth/LoginPage'
 import SignUpPage          from '@/pages/auth/SignUpPage'
@@ -36,24 +39,27 @@ import ProgressPage     from '@/pages/app/ProgressPage'
 import ProfilePage      from '@/pages/app/ProfilePage'
 import AddChildPage     from '@/pages/app/AddChildPage'
 import EditChildPage    from '@/pages/app/EditChildPage'
-import SubscriptionPage from '@/pages/app/SubscriptionPage'
+import SubscriptionPage    from '@/pages/app/SubscriptionPage'
+import ActivityDetailPage from '@/pages/app/ActivityDetailPage'
+
+import ChildSuccessPage  from '@/pages/app/ChildSuccessPage'
 
 import SuccessPage       from '@/pages/subscription/SuccessPage'
 import CancelPage        from '@/pages/subscription/CancelPage'
 import ManagePage        from '@/pages/subscription/ManagePage'
 
 const router = createBrowserRouter([
-  // ── Root redirect ───────────────────────────────────────────────────────
+  // ── Marketing homepage ──────────────────────────────────────────────────
   {
     path:    '/',
-    element: <Navigate to="/app/today" replace />,
+    element: <PublicRoute><HomePage /></PublicRoute>,
   },
 
-  // ── Auth pages (no layout wrapper — AuthLayout used inside each page) ──
-  { path: '/login',           element: <LoginPage /> },
-  { path: '/signup',          element: <SignUpPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/reset-password',  element: <ResetPasswordPage /> },
+  // ── Auth pages — wrapped in PublicRoute to redirect authenticated users ──
+  { path: '/login',           element: <PublicRoute><LoginPage /></PublicRoute> },
+  { path: '/signup',          element: <PublicRoute><SignUpPage /></PublicRoute> },
+  { path: '/forgot-password', element: <PublicRoute><ForgotPasswordPage /></PublicRoute> },
+  { path: '/reset-password',  element: <PublicRoute><ResetPasswordPage /></PublicRoute> },
 
   // ── Authenticated app shell ─────────────────────────────────────────────
   {
@@ -69,8 +75,10 @@ const router = createBrowserRouter([
       { path: 'library',                element: <LibraryPage /> },
       { path: 'progress',               element: <ProgressPage /> },
       { path: 'profile',                element: <ProfilePage /> },
+      { path: 'activities/:activityId',  element: <ActivityDetailPage /> },
       { path: 'children/add',           element: <AddChildPage /> },
       { path: 'children/:id/edit',      element: <EditChildPage /> },
+      { path: 'children/success/:id',   element: <ChildSuccessPage /> },
       { path: 'subscribe',              element: <SubscriptionPage /> },
       { path: 'subscription/success',   element: <SuccessPage /> },
       { path: 'subscription/cancel',    element: <CancelPage /> },

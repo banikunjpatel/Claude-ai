@@ -14,6 +14,7 @@ interface AuthContextValue {
   user: User | null
   session: Session | null
   isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ user: User; session: Session }>
   signOut: () => Promise<void>
 }
 
@@ -23,8 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { session, user, isAuthLoading, setSession, setUser, setIsAuthLoading } = useAppStore()
 
   useEffect(() => {
+    // mounted flag prevents the stale getSession() callback (from React Strict
+    // Mode's first effect run) from overwriting state after the effect is cleaned
+    // up and re-run.
+    let mounted = true
+
     // Hydrate from the existing session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
       setSession(session)
       setUser(session?.user ?? null)
       setIsAuthLoading(false)
@@ -37,8 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [setSession, setUser, setIsAuthLoading])
+
+  async function signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    return data as { user: User; session: Session }
+  }
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -46,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading: isAuthLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading: isAuthLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

@@ -55,17 +55,24 @@ export function useCompleteActivity() {
       activityId,
       childId,
       durationSeconds,
+      reaction,
     }: {
       activityId: string
       childId: string
       durationSeconds?: number
-    }) => activitiesApi.completeActivity(activityId, childId, durationSeconds).then((r) => r.data),
+      reaction?: string
+    }) =>
+      activitiesApi
+        .completeActivity(activityId, childId, durationSeconds, reaction)
+        .then((r) => r.data),
     onSuccess: (_data, { childId }) => {
-      // Refresh the today card, completion history, and progress
+      // Refresh the today card, completion history, and all progress views
       qc.invalidateQueries({ queryKey: activityKeys.today(childId) })
       qc.invalidateQueries({ queryKey: activityKeys.history(childId) })
       qc.invalidateQueries({ queryKey: progressKeys.summary(childId) })
+      qc.invalidateQueries({ queryKey: progressKeys.summaryV2(childId) })
       qc.invalidateQueries({ queryKey: progressKeys.streak(childId) })
+      qc.invalidateQueries({ queryKey: progressKeys.history(childId) })
     },
   })
 }

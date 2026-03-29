@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # ── Stripe ───────────────────────────────────────────────────────────────
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_PRO_MONTHLY: str = ""   # set in .env from Stripe dashboard
+    STRIPE_PRICE_PRO_ANNUAL: str = ""
+    STRIPE_PRICE_FAMILY: str = ""
+
+    # ── Frontend ─────────────────────────────────────────────────────────────
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # ── Apple IAP ────────────────────────────────────────────────────────────
     APPLE_APP_BUNDLE_ID: str = ""

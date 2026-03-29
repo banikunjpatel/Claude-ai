@@ -159,6 +159,20 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+/championkids-web/node_modules/
+/championkids-web/coverage/
+/championkids-web/tsconfig.node.tsbuildinfo
+/championkids-web/tsconfig.tsbuildinfo
+/championkids-web/vite.config.d.ts
+/championkids-web/vite.config.js
+/championkids-web/tailwind.config.d.ts
+/championkids-web/tailwind.config.js
+
+# Root node_modules / lock file (not part of any sub-project)
+/node_modules/
+/package-lock.json
+
+
 # Pyre type checker
 .pyre/
 
